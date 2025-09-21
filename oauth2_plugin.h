@@ -55,6 +55,9 @@
 #define SASLPLUGINAPI extern
 #endif
 
+/* Special return codes for configuration loading */
+#define OAUTH2_CONFIG_NOT_FOUND SASL_CONTINUE  /* No configuration present - plugin inactive */
+
 /* Default values */
 #define OAUTH2_DEFAULT_USER_CLAIM "email"
 #define OAUTH2_DEFAULT_SCOPE "openid email profile"
@@ -87,6 +90,7 @@ typedef struct oauth2_config {
     
     /* Runtime state */
     oauth2_log_t *oauth2_log;
+    int configured;  /* 1 if essential configuration is present, 0 if not */
 } oauth2_config_t;
 
 /* Function prototypes */

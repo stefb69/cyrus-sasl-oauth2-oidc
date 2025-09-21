@@ -216,11 +216,23 @@ int oauth2_config_load(oauth2_config_t *config, const sasl_utils_t *utils) {
     
     /* Ensure we have at least one discovery URL or issuer */
     if (!config->discovery_urls && !config->issuers) {
-        OAUTH2_LOG_ERR(utils, "Either %s/%s or %s/%s must be configured", 
-                      OAUTH2_CONF_DISCOVERY_URLS, OAUTH2_CONF_DISCOVERY_URL,
-                      OAUTH2_CONF_ISSUERS, OAUTH2_CONF_ISSUER);
-        return SASL_FAIL;
+        /* Check if any OAuth2-related configuration was attempted but failed */
+        if (discovery_urls_str || discovery_url_str || issuers_str || issuer_str) {
+            /* Configuration was attempted but invalid - this is an error */
+            OAUTH2_LOG_ERR(utils, "Either %s/%s or %s/%s must be configured", 
+                          OAUTH2_CONF_DISCOVERY_URLS, OAUTH2_CONF_DISCOVERY_URL,
+                          OAUTH2_CONF_ISSUERS, OAUTH2_CONF_ISSUER);
+            return SASL_FAIL;
+        } else {
+            /* No OAuth2 configuration found - plugin should remain inactive */
+            OAUTH2_LOG_DEBUG(utils, "No OAuth2 configuration found - plugin will remain inactive");
+            config->configured = 0;
+            return OAUTH2_CONFIG_NOT_FOUND;
+        }
     }
+    
+    /* Mark configuration as present */
+    config->configured = 1;
     
     /* If only issuers provided, construct discovery URLs */
     if (!config->discovery_urls && config->issuers) {
@@ -257,11 +269,12 @@ int oauth2_config_load(oauth2_config_t *config, const sasl_utils_t *utils) {
         }
     }
     
-    /* Load client credentials */
+    /* Load client credentials - only required if configuration is present */
     config->client_id = (char*)oauth2_config_get_string(utils, OAUTH2_CONF_CLIENT_ID, NULL);
     config->client_secret = (char*)oauth2_config_get_string(utils, OAUTH2_CONF_CLIENT_SECRET, NULL);
     
-    if (!config->client_id) {
+    /* Only validate client_id if configuration is present */
+    if (config->configured && !config->client_id) {
         OAUTH2_LOG_ERR(utils, "%s must be configured", OAUTH2_CONF_CLIENT_ID);
         return SASL_FAIL;
     }
