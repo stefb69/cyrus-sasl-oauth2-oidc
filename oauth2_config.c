@@ -14,6 +14,113 @@
 #define _GNU_SOURCE
 #endif
 
+/* Include for file operations */
+#include <stdio.h>
+
+/* Helper function to load configuration from a fallback file */
+static int oauth2_load_fallback_config(oauth2_config_t *config, const sasl_utils_t *utils, const char *filepath) {
+    FILE *fp;
+    char line[1024];
+    char *discovery_url = NULL;
+    char *issuer = NULL;
+    char *client_id = NULL;
+    char *audience = NULL;
+    
+    fp = fopen(filepath, "r");
+    if (!fp) {
+        OAUTH2_LOG_DEBUG(utils, "Fallback config file not found: %s", filepath);
+        return OAUTH2_CONFIG_NOT_FOUND;
+    }
+    
+    OAUTH2_LOG_DEBUG(utils, "Loading fallback configuration from: %s", filepath);
+    
+    /* Read and parse the file line by line */
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        /* Strip newline */
+        size_t len = strlen(line);
+        if (len > 0 && line[len-1] == '\n') {
+            line[len-1] = '\0';
+        }
+        
+        /* Skip comments and empty lines */
+        if (line[0] == '#' || line[0] == '\0' || line[0] == '\n') {
+            continue;
+        }
+        
+        /* Parse key: value pairs */
+        char *colon = strchr(line, ':');
+        if (!colon) {
+            continue;
+        }
+        
+        *colon = '\0';
+        char *key = line;
+        char *value = colon + 1;
+        
+        /* Trim leading/trailing whitespace from key and value */
+        while (*key == ' ' || *key == '\t') key++;
+        while (*value == ' ' || *value == '\t') value++;
+        
+        char *key_end = key + strlen(key) - 1;
+        while (key_end > key && (*key_end == ' ' || *key_end == '\t')) {
+            *key_end = '\0';
+            key_end--;
+        }
+        
+        char *value_end = value + strlen(value) - 1;
+        while (value_end > value && (*value_end == ' ' || *value_end == '\t')) {
+            *value_end = '\0';
+            value_end--;
+        }
+        
+        /* Store values */
+        if (strcmp(key, "oauth2_discovery_url") == 0 && strlen(value) > 0) {
+            discovery_url = strdup(value);
+        } else if (strcmp(key, "oauth2_issuer") == 0 && strlen(value) > 0) {
+            issuer = strdup(value);
+        } else if (strcmp(key, "oauth2_client_id") == 0 && strlen(value) > 0) {
+            client_id = strdup(value);
+        } else if (strcmp(key, "oauth2_audience") == 0 && strlen(value) > 0) {
+            audience = strdup(value);
+        }
+    }
+    
+    fclose(fp);
+    
+    /* Apply loaded configuration if we have essential values */
+    if (discovery_url || issuer) {
+        if (discovery_url) {
+            config->discovery_urls = oauth2_parse_string_list(discovery_url, &config->discovery_urls_count);
+            free(discovery_url);
+        } else if (issuer) {
+            config->issuers = oauth2_parse_string_list(issuer, &config->issuers_count);
+            free(issuer);
+        }
+        
+        if (client_id) {
+            config->client_id = client_id;  /* Keep the strdup'd pointer */
+            config->client_id_allocated = 1;  /* Mark as allocated so we can free it later */
+        }
+        
+        if (audience) {
+            config->audiences = oauth2_parse_string_list(audience, &config->audiences_count);
+            free(audience);
+        }
+        
+        OAUTH2_LOG_INFO(utils, "Loaded OAuth2 configuration from fallback file: %s", filepath);
+        return SASL_OK;
+    }
+    
+    /* Cleanup if we didn't use the values */
+    if (discovery_url) free(discovery_url);
+    if (issuer) free(issuer);
+    if (client_id) free(client_id);
+    if (audience) free(audience);
+    
+    OAUTH2_LOG_DEBUG(utils, "Fallback config file exists but contains no valid OAuth2 configuration");
+    return OAUTH2_CONFIG_NOT_FOUND;
+}
+
 /* Utility function to parse space-separated string lists */
 /*@null@*/ char **oauth2_parse_string_list(const char *input, int *count) {
     *count = 0;
@@ -158,8 +265,13 @@ void oauth2_config_free(oauth2_config_t *config) {
     oauth2_free_string_list(config->issuers, config->issuers_count);
     oauth2_free_string_list(config->audiences, config->audiences_count);
     
-    /* NOTE: Simple string configurations are pointers to SASL internal data - do NOT free them */
-    /* config->client_id, client_secret, scope, user_claim point to getopt() results */
+    /* Free client_id if it was allocated from fallback config */
+    if (config->client_id_allocated && config->client_id) {
+        free(config->client_id);
+    }
+    
+    /* NOTE: Other simple string configurations are pointers to SASL internal data - do NOT free them */
+    /* config->client_secret, scope, user_claim point to getopt() results */
     
     /* Cleanup liboauth2 logging context */
     if (config->oauth2_log) {
@@ -224,10 +336,20 @@ int oauth2_config_load(oauth2_config_t *config, const sasl_utils_t *utils) {
                           OAUTH2_CONF_ISSUERS, OAUTH2_CONF_ISSUER);
             return SASL_FAIL;
         } else {
-            /* No OAuth2 configuration found - plugin should remain inactive */
-            OAUTH2_LOG_DEBUG(utils, "No OAuth2 configuration found - plugin will remain inactive");
-            config->configured = 0;
-            return OAUTH2_CONFIG_NOT_FOUND;
+            /* No OAuth2 configuration found in SASL config - try fallback config file */
+            const char *fallback_path = oauth2_config_get_string(utils, OAUTH2_CONF_FALLBACK_CONFIG, 
+                                                                 OAUTH2_DEFAULT_FALLBACK_CONFIG);
+            
+            int fallback_result = oauth2_load_fallback_config(config, utils, fallback_path);
+            if (fallback_result == SASL_OK) {
+                /* Successfully loaded from fallback - continue with configuration */
+                OAUTH2_LOG_INFO(utils, "Using fallback configuration from: %s", fallback_path);
+            } else {
+                /* No fallback configuration found either - plugin should remain inactive */
+                OAUTH2_LOG_DEBUG(utils, "No OAuth2 configuration found - plugin will remain inactive");
+                config->configured = 0;
+                return OAUTH2_CONFIG_NOT_FOUND;
+            }
         }
     }
     
@@ -270,8 +392,13 @@ int oauth2_config_load(oauth2_config_t *config, const sasl_utils_t *utils) {
     }
     
     /* Load client credentials - only required if configuration is present */
-    config->client_id = (char*)oauth2_config_get_string(utils, OAUTH2_CONF_CLIENT_ID, NULL);
-    config->client_secret = (char*)oauth2_config_get_string(utils, OAUTH2_CONF_CLIENT_SECRET, NULL);
+    /* Don't override if already set from fallback config */
+    if (!config->client_id) {
+        config->client_id = (char*)oauth2_config_get_string(utils, OAUTH2_CONF_CLIENT_ID, NULL);
+    }
+    if (!config->client_secret) {
+        config->client_secret = (char*)oauth2_config_get_string(utils, OAUTH2_CONF_CLIENT_SECRET, NULL);
+    }
     
     /* Only validate client_id if configuration is present */
     if (config->configured && !config->client_id) {

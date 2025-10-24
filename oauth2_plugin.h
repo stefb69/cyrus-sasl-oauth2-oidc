@@ -47,6 +47,7 @@
 #define OAUTH2_CONF_SSL_VERIFY "oauth2_ssl_verify"
 #define OAUTH2_CONF_TIMEOUT "oauth2_timeout"
 #define OAUTH2_CONF_DEBUG "oauth2_debug"
+#define OAUTH2_CONF_FALLBACK_CONFIG "oauth2_fallback_config"
 
 /* Plugin API definition */
 #ifdef WIN32
@@ -65,6 +66,7 @@
 #define OAUTH2_DEFAULT_VERIFY_SIGNATURE 1
 #define OAUTH2_DEFAULT_SSL_VERIFY 1
 #define OAUTH2_DEFAULT_DEBUG 0
+#define OAUTH2_DEFAULT_FALLBACK_CONFIG "/etc/sasl2/oauth2.conf"
 
 /* Plugin configuration structure */
 typedef struct oauth2_config {
@@ -91,6 +93,7 @@ typedef struct oauth2_config {
     /* Runtime state */
     oauth2_log_t *oauth2_log;
     int configured;  /* 1 if essential configuration is present, 0 if not */
+    int client_id_allocated;  /* 1 if client_id was allocated (from fallback), 0 if from SASL */
 } oauth2_config_t;
 
 /* Function prototypes */
