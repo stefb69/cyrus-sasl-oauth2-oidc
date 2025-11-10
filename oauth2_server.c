@@ -529,11 +529,18 @@ int oauth2_server_step(void *conn_context, sasl_server_params_t *params,
     char *token = NULL;
     int parse_result;
     
-    /* Try to parse as XOAUTH2 first, then OAUTHBEARER */
-    parse_result = oauth2_parse_xoauth2(utils, clientin, clientinlen, &username, &token);
-    if (parse_result != SASL_OK) {
-        /* If XOAUTH2 parsing fails, try OAUTHBEARER */
+    /* Looks like XOAUTH2 */
+    if (strncmp(clientin, "user=", 5) == 0) {
+        OAUTH2_LOG_INFO(utils, "Trying XOAuth2 authentication");
+        parse_result = oauth2_parse_xoauth2(utils, clientin, clientinlen, &username, &token);
+    /* Looks like OAUTHBEARER */
+    } else if (strncmp(clientin, "n,", 2) == 0) {
+        OAUTH2_LOG_INFO(utils, "Trying OAuthBearer authentication");
         parse_result = oauth2_parse_oauthbearer(clientin, clientinlen, &username, &token);
+    /* Default, try XOAUTH2 */
+    } else {
+        OAUTH2_LOG_INFO(utils, "Trying XOAuth2 authentication as failback");
+        parse_result = oauth2_parse_xoauth2(utils, clientin, clientinlen, &username, &token);
     }
     
     if (parse_result != SASL_OK) {

@@ -12,7 +12,8 @@ set -e
 OS=${1:-debian}
 VERSION=${2:-trixie}
 TARGET=${3:-packages}
-ARCH=${4:-amd64}
+HOST_ARCH=$(uname -m)
+TARGET_ARCH=${4:-amd64}
 IMAGE_NAME="cyrus-sasl-oauth2-oidc"
 
 # Validate OS type
@@ -51,12 +52,11 @@ case $OS in
 esac
 
 # Map architecture names
-DOCKER_ARCH="$ARCH"
 if [ "$OS" != "debian" ]; then
     # For RPM builds, map x86_64 -> amd64, aarch64 -> arm64
-    case $ARCH in
-        x86_64) DOCKER_ARCH="amd64" ;;
-        aarch64) DOCKER_ARCH="arm64" ;;
+    case $TARGET_ARCH in
+        x86_64) TARGET_ARCH="amd64" ;;
+        aarch64) TARGET_ARCH="arm64" ;;
     esac
 fi
 
@@ -64,7 +64,7 @@ echo "🚀 Building $OS package for $VERSION ($ARCH)..."
 echo "📋 Configuration:"
 echo "   OS: $OS"
 echo "   Version: $VERSION"
-echo "   Architecture: $ARCH (Docker: $DOCKER_ARCH)"
+echo "   Architecture: $HOST_ARCH (Target: $TARGET_ARCH)"
 echo "   Target: $TARGET"
 echo "   Dockerfile: $DOCKERFILE"
 
@@ -73,10 +73,10 @@ mkdir -p dist/packages
 
 # Build the Docker image
 echo "📦 Building Docker image..."
-if [ "$DOCKER_ARCH" != "amd64" ]; then
+if [ "$TARGET_ARCH" != "amd64" -o "$TARGET_ARCH" != "$HOST_ARCH" ]; then
     # Use buildx for multi-arch builds
     docker buildx build \
-        --platform "linux/$DOCKER_ARCH" \
+        --platform "linux/$TARGET_ARCH" \
         --target "$TARGET" \
         --tag "$IMAGE_NAME:$OS-$VERSION-$ARCH" \
         --file "$DOCKERFILE" \
