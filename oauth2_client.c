@@ -115,6 +115,13 @@ int oauth2_client_step(void *conn_context, sasl_client_params_t *params,
         return SASL_BADPARAM;
     }
     
+    /* Check if OAuth2 configuration is available */
+    if (!context->config || !context->config->configured) {
+        OAUTH2_LOG_DEBUG(utils, "OAuth2 client mechanism called but no configuration available");
+        utils->seterror(params->utils->conn, 0, "OAuth2 authentication not configured");
+        return SASL_UNAVAIL;
+    }
+    
     if (context->state != 0) {
         OAUTH2_LOG_ERR(utils, "Unexpected state in OAuth2 client authentication");
         return SASL_BADPROT;

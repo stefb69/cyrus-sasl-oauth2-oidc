@@ -1,0 +1,42 @@
+# OAuth2/OIDC SASL Plugin - Fallback Configuration
+# This file provides default OAuth2 configuration when applications don't have their own.
+# Location: /etc/sasl2/oauth2.conf (or custom path via oauth2_fallback_config option)
+#
+# This is useful for SASL tools like saslauthd, pluginviewer, imtest that don't have
+# dedicated configuration files but need to enumerate available SASL mechanisms.
+
+# === OIDC Provider Configuration ===
+# Use OIDC Discovery URL (recommended)
+oauth2_discovery_url: https://your-provider.com/.well-known/openid-configuration
+
+# OR use issuer (discovery URL will be constructed automatically)
+# oauth2_issuer: https://your-provider.com/
+
+# === Client Configuration ===
+# Client ID (required)
+oauth2_client_id: your-client-id
+
+# Audience for token validation (optional but recommended)
+oauth2_audience: your-audience
+
+# === Example Configurations for Common Providers ===
+
+## Keycloak
+# oauth2_discovery_url: https://keycloak.example.com/realms/myrealm/.well-known/openid-configuration
+# oauth2_client_id: mail-client
+# oauth2_audience: account
+
+## Authentik
+# oauth2_discovery_url: https://auth.example.com/application/o/mail/.well-known/openid-configuration
+# oauth2_client_id: mail-client
+# oauth2_audience: mail-service
+
+## Azure AD
+# oauth2_discovery_url: https://login.microsoftonline.com/YOUR_TENANT_ID/v2.0/.well-known/openid-configuration
+# oauth2_client_id: YOUR_CLIENT_ID
+# oauth2_audience: api://YOUR_CLIENT_ID
+
+## Google Workspace
+# oauth2_discovery_url: https://accounts.google.com/.well-known/openid-configuration
+# oauth2_client_id: YOUR_CLIENT_ID.apps.googleusercontent.com
+# oauth2_audience: YOUR_CLIENT_ID.apps.googleusercontent.com

@@ -332,7 +332,52 @@ sasl_oauth2_timeout: 10
 # === SASL Mechanism Selection ===
 # Enable OAuth2 mechanisms
 sasl_mech_list: oauthbearer xoauth2 plain login
+
+# === Fallback Configuration File ===
+# Path to fallback configuration file (default: /etc/sasl2/oauth2.conf)
+# Used when no OAuth2 configuration is found in application config
+sasl_oauth2_fallback_config: /etc/sasl2/oauth2.conf
 ```
+
+### Fallback Configuration File
+
+The plugin supports a fallback configuration file that provides default OAuth2 settings when applications don't have their own OAuth2 configuration. This is particularly useful for SASL tools like `saslauthd`, `pluginviewer`, and `imtest` that don't have dedicated configuration files.
+
+**Default Location**: `/etc/sasl2/oauth2.conf`
+
+**How It Works**:
+1. Plugin attempts to load OAuth2 configuration from the application's SASL config
+2. If no OAuth2 configuration is found, it checks the fallback config file
+3. If the fallback file exists and contains valid OAuth2 settings, those are used
+4. If neither source provides configuration, the plugin remains inactive
+
+**Example Fallback Configuration File** (`/etc/sasl2/oauth2.conf`):
+
+```ini
+# OAuth2/OIDC SASL Plugin - Fallback Configuration
+oauth2_discovery_url: https://your-provider.com/.well-known/openid-configuration
+oauth2_client_id: your-client-id
+oauth2_audience: your-audience
+```
+
+**Custom Fallback Path**:
+
+You can specify a custom fallback configuration path in any application's SASL config:
+
+```ini
+# In /etc/sasl2/appname.conf or /etc/imapd.conf
+oauth2_fallback_config: /etc/sasl2/custom-oauth2.conf
+# OR with sasl_ prefix for Cyrus IMAP
+sasl_oauth2_fallback_config: /etc/sasl2/custom-oauth2.conf
+```
+
+**Benefits**:
+- ✅ SASL tools work without errors even when OAuth2 is not configured for them
+- ✅ Single configuration file can provide defaults for all SASL applications
+- ✅ Application-specific configs always take precedence over fallback
+- ✅ Optional - existing installations are not affected
+
+See `oauth2.conf.example` for a complete example fallback configuration file.
 
 ## Multi-Provider Configuration
 
@@ -359,7 +404,7 @@ sasl_oauth2_client_id: primary-client-id
 sasl_oauth2_user_claim: email
 ```
 
-### Fallback Configuration
+### Multiple Provider Failover
 
 ```ini
 # Primary and backup providers

@@ -123,20 +123,26 @@ SASLPLUGINAPI int sasl_server_plug_init(const sasl_utils_t *utils,
             return SASL_FAIL;
         }
         
-        /* Load configuration - fail if essential config is missing */
+        /* Load configuration - allow graceful handling of missing config */
         int config_result = oauth2_config_load(global_config, utils);
-        if (config_result != SASL_OK) {
-            utils->log(utils->conn, SASL_LOG_ERR, "oauth2_plugin: Config load failed with %d - essential configuration missing", config_result);
-            utils->seterror(utils->conn, 0, "OAuth2: Essential configuration missing");
+        if (config_result == OAUTH2_CONFIG_NOT_FOUND) {
+            /* No OAuth2 configuration found - plugin will remain inactive but registered */
+            utils->log(utils->conn, SASL_LOG_DEBUG, "oauth2_plugin: No configuration found - plugin inactive");
+        } else if (config_result != SASL_OK) {
+            /* Configuration was attempted but invalid - this is an error */
+            utils->log(utils->conn, SASL_LOG_ERR, "oauth2_plugin: Config load failed with %d - invalid configuration", config_result);
+            utils->seterror(utils->conn, 0, "OAuth2: Invalid configuration");
             oauth2_config_free(global_config);
             global_config = NULL;
             return SASL_FAIL;
         }
         
-        /* Initialize server mechanisms */
-        int server_init_result = oauth2_server_init(utils, global_config);
-        if (server_init_result != SASL_OK) {
-            utils->log(utils->conn, SASL_LOG_WARN, "oauth2_plugin: Server init failed with %d", server_init_result);
+        /* Initialize server mechanisms only if configuration is present */
+        if (global_config->configured) {
+            int server_init_result = oauth2_server_init(utils, global_config);
+            if (server_init_result != SASL_OK) {
+                utils->log(utils->conn, SASL_LOG_WARN, "oauth2_plugin: Server init failed with %d", server_init_result);
+            }
         }
     }
     
@@ -174,16 +180,21 @@ SASLPLUGINAPI int sasl_client_plug_init(const sasl_utils_t *utils,
             return SASL_FAIL;
         }
         
-        if (oauth2_config_load(global_config, utils) != SASL_OK) {
-            utils->seterror(utils->conn, 0, "OAuth2: Failed to load configuration");
+        int config_result = oauth2_config_load(global_config, utils);
+        if (config_result == OAUTH2_CONFIG_NOT_FOUND) {
+            /* No OAuth2 configuration found - plugin will remain inactive but registered */
+            /* Don't set error for client - allow graceful operation */
+        } else if (config_result != SASL_OK) {
+            /* Configuration was attempted but invalid - this is an error */
+            utils->seterror(utils->conn, 0, "OAuth2: Invalid configuration");
             oauth2_config_free(global_config);
             global_config = NULL;
             return SASL_FAIL;
         }
     }
     
-    /* Initialize client mechanisms */
-    if (oauth2_client_init(utils, global_config) != SASL_OK) {
+    /* Initialize client mechanisms only if configuration is present */
+    if (global_config->configured && oauth2_client_init(utils, global_config) != SASL_OK) {
         utils->seterror(utils->conn, 0, "OAuth2: Failed to initialize client");
         if (!oauth2_server_plugins[0].glob_context) { /* Only free if server didn't set it */
             oauth2_config_free(global_config);

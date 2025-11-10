@@ -234,6 +234,46 @@ int test_config_edge_cases() {
     return 0;
 }
 
+/* Test missing configuration handling */
+int test_missing_configuration() {
+    /* Reset config to simulate no OAuth2 configuration */
+    mock_config_clear();
+    
+    /* Test that oauth2_config_load handles missing configuration gracefully */
+    sasl_utils_t utils = {
+        .getopt = mock_getopt,
+        .malloc = mock_malloc,
+        .free = mock_free,
+        .getopt_context = NULL,
+        .conn = NULL,
+        .log = mock_log,
+        .seterror = mock_seterror
+    };
+    
+    oauth2_config_t *config = oauth2_config_init(&utils);
+    TEST_ASSERT_NOT_NULL(config, "Should initialize config structure");
+    
+    int result = oauth2_config_load(config, &utils);
+    TEST_ASSERT(result == OAUTH2_CONFIG_NOT_FOUND, "Should return CONFIG_NOT_FOUND for missing config");
+    TEST_ASSERT(config->configured == 0, "Should mark config as not configured");
+    
+    oauth2_config_free(config);
+    
+    /* Test partial configuration (discovery URL but no client_id) should still mark as configured */
+    mock_config_clear();
+    mock_config_set("OAUTH2", OAUTH2_CONF_DISCOVERY_URL, "https://provider.com/.well-known/openid-configuration");
+    
+    config = oauth2_config_init(&utils);
+    TEST_ASSERT_NOT_NULL(config, "Should initialize config structure");
+    
+    result = oauth2_config_load(config, &utils);
+    TEST_ASSERT(result == SASL_FAIL, "Should fail for invalid config (missing client_id)");
+    
+    oauth2_config_free(config);
+    
+    return 0;
+}
+
 /* Main test runner for config tests */
 int main() {
     tests_total = 0;
@@ -250,6 +290,7 @@ int main() {
     RUN_TEST(test_memory_tracking);
     RUN_TEST(test_config_validation);
     RUN_TEST(test_config_edge_cases);
+    RUN_TEST(test_missing_configuration);
     
     printf("\nResults: %d/%d tests passed (%d failed)\n", 
            tests_passed, tests_total, tests_failed);

@@ -114,3 +114,11 @@ void mock_seterror(sasl_conn_t *conn, unsigned flags, const char *fmt, ...) {
     (void)fmt;
     /* No actual error handling in tests */
 }
+
+/* Mock log function with correct SASL signature */
+void mock_log(sasl_conn_t *conn, int level, const char *fmt, ...) {
+    /* For testing, we just ignore logging */
+    (void)conn;
+    (void)level;
+    (void)fmt;
+}

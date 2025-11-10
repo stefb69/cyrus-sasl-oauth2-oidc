@@ -45,6 +45,7 @@ void mock_reset_malloc_counts(void);
 int mock_get_malloc_count(void);
 int mock_get_free_count(void);
 void mock_seterror(sasl_conn_t *conn, unsigned flags, const char *fmt, ...);
+void mock_log(sasl_conn_t *conn, int level, const char *fmt, ...);
 
 /* Forward declaration to match SASL's usage */
 struct sasl_conn;
