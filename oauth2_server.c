@@ -125,31 +125,25 @@ static int oauth2_parse_oauthbearer(const char *input, unsigned inputlen,
         }
     }
     
-    /* Skip to ^A separator */
-    while (ptr < end && *ptr != '\x01') ptr++;
-    if (ptr >= end) {
-        free(data);
-        if (*username) { free(*username); *username = NULL; }
-        return SASL_BADAUTH;
+    /* Skip to auth=Bearer */
+    while (ptr < end) {
+        if (strncmp(ptr, "auth=Bearer ", 12) == 0) {
+            ptr += 12;
+            char *token_start = ptr;
+            while (ptr < end && *ptr != '\x01') ptr++;
+            *token = strndup(token_start, ptr - token_start);
+            free(data);
+            return SASL_OK;
+        }
+        /* Skip to next field */
+        while (ptr < end && *ptr != '\x01') ptr++;
+        if (ptr >= end) break;
+        ptr++; /* Skip ^A */
     }
-    ptr++; /* Skip ^A */
-    
-    /* Find "auth=Bearer " */
-    if (strncmp(ptr, "auth=Bearer ", 12) != 0) {
-        free(data);
-        if (*username) { free(*username); *username = NULL; }
-        return SASL_BADAUTH;
-    }
-    ptr += 12;
-    
-    /* Extract token until ^A */
-    char *token_start = ptr;
-    while (ptr < end && *ptr != '\x01') ptr++;
-    
-    *token = strndup(token_start, ptr - token_start);
     
     free(data);
-    return SASL_OK;
+    if (*username) { free(*username); *username = NULL; }
+    return SASL_BADAUTH;
 }
 
 /* Utility functions for error handling and cleanup */
