@@ -1,5 +1,6 @@
 # Multi-stage Dockerfile for building RPM packages on Fedora/RHEL
-ARG FEDORA_VERSION=41
+ARG FEDORA_VERSION=43
+ARG PKG_VERSION=1.0.0
 
 # Stage 1: Builder - Install dependencies and build RPM
 FROM fedora:${FEDORA_VERSION} AS builder
@@ -30,11 +31,12 @@ RUN dnf update -y && \
 RUN rpmdev-setuptree
 
 # Copy source code
+ARG PKG_VERSION
 WORKDIR /root/rpmbuild/SOURCES
-COPY . cyrus-sasl-oauth2-oidc-1.0.0/
+COPY . cyrus-sasl-oauth2-oidc-${PKG_VERSION}/
 
 # Create source tarball
-RUN tar -czf cyrus-sasl-oauth2-oidc-1.0.0.tar.gz cyrus-sasl-oauth2-oidc-1.0.0/
+RUN tar -czf cyrus-sasl-oauth2-oidc-${PKG_VERSION}.tar.gz cyrus-sasl-oauth2-oidc-${PKG_VERSION}/
 
 # Copy spec file
 COPY rpm/cyrus-sasl-oauth2-oidc.spec /root/rpmbuild/SPECS/

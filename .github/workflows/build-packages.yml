@@ -186,6 +186,7 @@ jobs:
           --tag cyrus-sasl-oauth2-oidc-packages:${{ matrix.os }}-${{ matrix.version }}-${{ matrix.arch }} \
           --file ${{ matrix.dockerfile }} \
           --build-arg FEDORA_VERSION=${{ matrix.version }} \
+          --build-arg PKG_VERSION=${{ steps.version.outputs.VERSION }} \
           --load \
           .
         
@@ -244,6 +245,7 @@ jobs:
           --tag cyrus-sasl-oauth2-oidc-test:${{ matrix.os }}-${{ matrix.version }}-${{ matrix.arch }} \
           --file ${{ matrix.dockerfile }} \
           --build-arg FEDORA_VERSION=${{ matrix.version }} \
+          --build-arg PKG_VERSION=${{ steps.version.outputs.VERSION }} \
           --load \
           .
         
