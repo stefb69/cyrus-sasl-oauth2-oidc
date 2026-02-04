@@ -22,9 +22,19 @@ static int oauth2_load_fallback_config(oauth2_config_t *config, const sasl_utils
     FILE *fp;
     char line[1024];
     char *discovery_url = NULL;
+    char *discovery_urls = NULL;
     char *issuer = NULL;
+    char *issuers = NULL;
     char *client_id = NULL;
+    char *client_secret = NULL;
     char *audience = NULL;
+    char *audiences = NULL;
+    char *scope = NULL;
+    char *user_claim = NULL;
+    int verify_signature = -1;  /* -1 means not set */
+    int ssl_verify = -1;
+    int timeout = -1;
+    int debug = -1;
     
     fp = fopen(filepath, "r");
     if (!fp) {
@@ -73,49 +83,141 @@ static int oauth2_load_fallback_config(oauth2_config_t *config, const sasl_utils
             value_end--;
         }
         
-        /* Store values */
-        if (strcmp(key, "oauth2_discovery_url") == 0 && strlen(value) > 0) {
+        /* Store values - now handling ALL configuration options */
+        if (strlen(value) == 0) {
+            continue;  /* Skip empty values */
+        }
+        
+        if (strcmp(key, "oauth2_discovery_url") == 0) {
             discovery_url = strdup(value);
-        } else if (strcmp(key, "oauth2_issuer") == 0 && strlen(value) > 0) {
+        } else if (strcmp(key, "oauth2_discovery_urls") == 0) {
+            discovery_urls = strdup(value);
+        } else if (strcmp(key, "oauth2_issuer") == 0) {
             issuer = strdup(value);
-        } else if (strcmp(key, "oauth2_client_id") == 0 && strlen(value) > 0) {
+        } else if (strcmp(key, "oauth2_issuers") == 0) {
+            issuers = strdup(value);
+        } else if (strcmp(key, "oauth2_client_id") == 0) {
             client_id = strdup(value);
-        } else if (strcmp(key, "oauth2_audience") == 0 && strlen(value) > 0) {
+        } else if (strcmp(key, "oauth2_client_secret") == 0) {
+            client_secret = strdup(value);
+        } else if (strcmp(key, "oauth2_audience") == 0) {
             audience = strdup(value);
+        } else if (strcmp(key, "oauth2_audiences") == 0) {
+            audiences = strdup(value);
+        } else if (strcmp(key, "oauth2_scope") == 0) {
+            scope = strdup(value);
+        } else if (strcmp(key, "oauth2_user_claim") == 0) {
+            user_claim = strdup(value);
+        } else if (strcmp(key, "oauth2_verify_signature") == 0) {
+            verify_signature = (strcasecmp(value, "yes") == 0 || 
+                               strcasecmp(value, "true") == 0 || 
+                               strcasecmp(value, "1") == 0) ? 1 : 0;
+        } else if (strcmp(key, "oauth2_ssl_verify") == 0) {
+            ssl_verify = (strcasecmp(value, "yes") == 0 || 
+                         strcasecmp(value, "true") == 0 || 
+                         strcasecmp(value, "1") == 0) ? 1 : 0;
+        } else if (strcmp(key, "oauth2_timeout") == 0) {
+            char *endptr;
+            long parsed_value = strtol(value, &endptr, 10);
+            if (endptr != value && *endptr == '\0' && parsed_value >= 0 && parsed_value <= INT_MAX) {
+                timeout = (int)parsed_value;
+            }
+        } else if (strcmp(key, "oauth2_debug") == 0) {
+            debug = (strcasecmp(value, "yes") == 0 || 
+                    strcasecmp(value, "true") == 0 || 
+                    strcasecmp(value, "1") == 0) ? 1 : 0;
         }
     }
     
     fclose(fp);
     
     /* Apply loaded configuration if we have essential values */
-    if (discovery_url || issuer) {
-        if (discovery_url) {
+    if (discovery_url || discovery_urls || issuer || issuers) {
+        /* Handle discovery URLs - prefer plural form */
+        if (discovery_urls) {
+            config->discovery_urls = oauth2_parse_string_list(discovery_urls, &config->discovery_urls_count);
+            free(discovery_urls);
+        } else if (discovery_url) {
             config->discovery_urls = oauth2_parse_string_list(discovery_url, &config->discovery_urls_count);
             free(discovery_url);
+        }
+        
+        /* Handle issuers - prefer plural form */
+        if (issuers) {
+            config->issuers = oauth2_parse_string_list(issuers, &config->issuers_count);
+            free(issuers);
         } else if (issuer) {
             config->issuers = oauth2_parse_string_list(issuer, &config->issuers_count);
             free(issuer);
         }
         
+        /* Apply client credentials */
         if (client_id) {
             config->client_id = client_id;  /* Keep the strdup'd pointer */
             config->client_id_allocated = 1;  /* Mark as allocated so we can free it later */
         }
         
-        if (audience) {
+        if (client_secret) {
+            config->client_secret = client_secret;  /* Keep the strdup'd pointer */
+            config->client_secret_allocated = 1;  /* Mark as allocated so we can free it later */
+        }
+        
+        /* Handle audiences - prefer plural form */
+        if (audiences) {
+            config->audiences = oauth2_parse_string_list(audiences, &config->audiences_count);
+            free(audiences);
+        } else if (audience) {
             config->audiences = oauth2_parse_string_list(audience, &config->audiences_count);
             free(audience);
         }
         
+        /* Apply other string settings */
+        if (scope) {
+            config->scope = scope;  /* Keep the strdup'd pointer */
+            config->scope_allocated = 1;
+        }
+        
+        if (user_claim) {
+            config->user_claim = user_claim;  /* Keep the strdup'd pointer */
+            config->user_claim_allocated = 1;
+        }
+        
+        /* Apply boolean/integer settings */
+        if (verify_signature >= 0) {
+            config->verify_signature = verify_signature;
+        }
+        
+        if (ssl_verify >= 0) {
+            config->ssl_verify = ssl_verify;
+        }
+        
+        if (timeout >= 0) {
+            config->timeout = timeout;
+        }
+        
+        if (debug >= 0) {
+            config->debug = debug;
+        }
+        
         OAUTH2_LOG_INFO(utils, "Loaded OAuth2 configuration from fallback file: %s", filepath);
+        OAUTH2_LOG_DEBUG(utils, "Fallback loaded: user_claim=%s, scope=%s, debug=%s",
+                        config->user_claim ? config->user_claim : "(default)",
+                        config->scope ? config->scope : "(default)",
+                        config->debug >= 0 ? (config->debug ? "yes" : "no") : "(default)");
         return SASL_OK;
     }
     
     /* Cleanup if we didn't use the values */
     if (discovery_url) free(discovery_url);
+    if (discovery_urls) free(discovery_urls);
     if (issuer) free(issuer);
+    if (issuers) free(issuers);
     if (client_id) free(client_id);
+    if (client_secret) free(client_secret);
     if (audience) free(audience);
+    if (audiences) free(audiences);
+    if (scope) free(scope);
+    if (user_claim) free(user_claim);
     
     OAUTH2_LOG_DEBUG(utils, "Fallback config file exists but contains no valid OAuth2 configuration");
     return OAUTH2_CONFIG_NOT_FOUND;
@@ -246,6 +348,12 @@ oauth2_config_t *oauth2_config_init(const sasl_utils_t *utils) {
     
     memset(config, 0, sizeof(oauth2_config_t));
     
+    /* Initialize boolean/int values to -1 to indicate "not set" */
+    config->verify_signature = -1;
+    config->ssl_verify = -1;
+    config->timeout = -1;
+    config->debug = -1;
+    
     /* Initialize liboauth2 logging context with default level (will be adjusted after config load) */
     config->oauth2_log = oauth2_init(OAUTH2_LOG_WARN, NULL);
     if (!config->oauth2_log) {
@@ -265,13 +373,27 @@ void oauth2_config_free(oauth2_config_t *config) {
     oauth2_free_string_list(config->issuers, config->issuers_count);
     oauth2_free_string_list(config->audiences, config->audiences_count);
     
-    /* Free client_id if it was allocated from fallback config */
+    /* Free strings if they were allocated from fallback config */
     if (config->client_id_allocated && config->client_id) {
         free(config->client_id);
     }
     
+    if (config->client_secret_allocated && config->client_secret) {
+        /* Clear sensitive data before freeing */
+        memset(config->client_secret, 0, strlen(config->client_secret));
+        free(config->client_secret);
+    }
+    
+    if (config->scope_allocated && config->scope) {
+        free(config->scope);
+    }
+    
+    if (config->user_claim_allocated && config->user_claim) {
+        free(config->user_claim);
+    }
+    
     /* NOTE: Other simple string configurations are pointers to SASL internal data - do NOT free them */
-    /* config->client_secret, scope, user_claim point to getopt() results */
+    /* Only free if the _allocated flag is set */
     
     /* Cleanup liboauth2 logging context */
     if (config->oauth2_log) {
@@ -420,21 +542,36 @@ int oauth2_config_load(oauth2_config_t *config, const sasl_utils_t *utils) {
         return SASL_FAIL;
     }
     
-    /* Parse audiences (priority: plural form, then singular) */
-    if (audiences_str) {
-        config->audiences = oauth2_parse_string_list(audiences_str, &config->audiences_count);
-    } else if (audience_str) {
-        config->audiences = oauth2_parse_string_list(audience_str, &config->audiences_count);
+    /* Parse audiences (priority: plural form, then singular) - don't override fallback */
+    if (!config->audiences) {
+        if (audiences_str) {
+            config->audiences = oauth2_parse_string_list(audiences_str, &config->audiences_count);
+        } else if (audience_str) {
+            config->audiences = oauth2_parse_string_list(audience_str, &config->audiences_count);
+        }
     }
     
-    config->scope = (char*)oauth2_config_get_string(utils, OAUTH2_CONF_SCOPE, OAUTH2_DEFAULT_SCOPE);
-    config->user_claim = (char*)oauth2_config_get_string(utils, OAUTH2_CONF_USER_CLAIM, OAUTH2_DEFAULT_USER_CLAIM);
-    config->verify_signature = oauth2_config_get_bool(utils, OAUTH2_CONF_VERIFY_SIGNATURE, OAUTH2_DEFAULT_VERIFY_SIGNATURE);
+    /* Load other settings - don't override if already set from fallback */
+    if (!config->scope) {
+        config->scope = (char*)oauth2_config_get_string(utils, OAUTH2_CONF_SCOPE, OAUTH2_DEFAULT_SCOPE);
+    }
+    if (!config->user_claim) {
+        config->user_claim = (char*)oauth2_config_get_string(utils, OAUTH2_CONF_USER_CLAIM, OAUTH2_DEFAULT_USER_CLAIM);
+    }
+    
+    /* Load boolean/int settings - only if not set by fallback (check for default values) */
+    /* Note: We can't easily detect if these were set by fallback, so we always apply SASL/defaults */
+    /* This means fallback boolean/int values will be overridden by SASL values if present */
+    config->verify_signature = oauth2_config_get_bool(utils, OAUTH2_CONF_VERIFY_SIGNATURE, 
+                                                       config->verify_signature >= 0 ? config->verify_signature : OAUTH2_DEFAULT_VERIFY_SIGNATURE);
     
     /* Load network settings */
-    config->ssl_verify = oauth2_config_get_bool(utils, OAUTH2_CONF_SSL_VERIFY, OAUTH2_DEFAULT_SSL_VERIFY);
-    config->timeout = oauth2_config_get_int(utils, OAUTH2_CONF_TIMEOUT, OAUTH2_DEFAULT_TIMEOUT);
-    config->debug = oauth2_config_get_bool(utils, OAUTH2_CONF_DEBUG, OAUTH2_DEFAULT_DEBUG);
+    config->ssl_verify = oauth2_config_get_bool(utils, OAUTH2_CONF_SSL_VERIFY, 
+                                                 config->ssl_verify >= 0 ? config->ssl_verify : OAUTH2_DEFAULT_SSL_VERIFY);
+    config->timeout = oauth2_config_get_int(utils, OAUTH2_CONF_TIMEOUT, 
+                                            config->timeout >= 0 ? config->timeout : OAUTH2_DEFAULT_TIMEOUT);
+    config->debug = oauth2_config_get_bool(utils, OAUTH2_CONF_DEBUG, 
+                                           config->debug >= 0 ? config->debug : OAUTH2_DEFAULT_DEBUG);
     
     /* Adjust liboauth2 log level based on debug setting */
     if (config->oauth2_log) {
