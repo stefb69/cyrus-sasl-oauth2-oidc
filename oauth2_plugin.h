@@ -93,7 +93,12 @@ typedef struct oauth2_config {
     /* Runtime state */
     oauth2_log_t *oauth2_log;
     int configured;  /* 1 if essential configuration is present, 0 if not */
-    int client_id_allocated;  /* 1 if client_id was allocated (from fallback), 0 if from SASL */
+    
+    /* Allocation tracking for fallback config (to know what to free) */
+    int client_id_allocated;      /* 1 if client_id was allocated (from fallback), 0 if from SASL */
+    int client_secret_allocated;  /* 1 if client_secret was allocated (from fallback), 0 if from SASL */
+    int scope_allocated;          /* 1 if scope was allocated (from fallback), 0 if from SASL */
+    int user_claim_allocated;     /* 1 if user_claim was allocated (from fallback), 0 if from SASL */
 } oauth2_config_t;
 
 /* Function prototypes */
