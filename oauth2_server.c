@@ -249,7 +249,18 @@ static int oauth2_validate_jwt_token(const sasl_utils_t *utils,
         
         if (rv == NULL) {
             /* liboauth2 handles caching internally - we don't need to detect it manually */
+            /* Compatibility with liboauth2 1.x (5 params) and 2.x (6 params) API.
+             * We try the new API first, and if it doesn't compile, configure.ac 
+             * will detect it and define LIBOAUTH2_OLD_API for us.
+             */
+#ifdef LIBOAUTH2_OLD_API
+            /* liboauth2 < 2.2.0 - 5 parameters */
             validation_success = oauth2_token_verify(config->oauth2_log, NULL, verify, token, &json_payload);
+#else
+            /* liboauth2 >= 2.2.0 - 6 parameters (added status_code) */
+            oauth2_http_status_code_t status_code = 0;
+            validation_success = oauth2_token_verify(config->oauth2_log, NULL, verify, token, &json_payload, &status_code);
+#endif
             if (validation_success) {
                 OAUTH2_LOG_INFO(utils, "JWT validation successful using metadata discovery");
             } else {
