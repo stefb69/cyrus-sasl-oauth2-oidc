@@ -232,7 +232,6 @@ The OAuth2 SASL plugin configuration format **depends on the application** you'r
 | Application Type | Config File Location | Option Format | Example |
 |-----------------|---------------------|---------------|---------|
 | **Cyrus IMAP** | `/etc/imapd.conf` | `sasl_oauth2_*` | `sasl_oauth2_discovery_url: https://...` |
-| **Postfix SMTP** | `/etc/sasl2/smtpd.conf` | `oauth2_*` | `oauth2_discovery_url: https://...` |
 | **Dovecot** | `/etc/sasl2/dovecot.conf` | `oauth2_*` | `oauth2_discovery_url: https://...` |
 | **Sendmail** | `/etc/sasl2/Sendmail.conf` | `oauth2_*` | `oauth2_discovery_url: https://...` |
 
@@ -341,7 +340,7 @@ sasl_oauth2_fallback_config: /etc/sasl2/oauth2.conf
 
 ### Fallback Configuration File
 
-The plugin supports a fallback configuration file that provides default OAuth2 settings when applications don't have their own OAuth2 configuration. This is particularly useful for SASL tools like `saslauthd`, `pluginviewer`, and `imtest` that don't have dedicated configuration files.
+The plugin supports a fallback configuration file that provides default OAuth2 settings when applications don't have their own OAuth2 configuration. This is particularly useful for SASL tools like `saslauthd`, `pluginviewer`, and `imtest` that don't have dedicated configuration files, and for applications like Postfix that only read a subset of SASL configuration options.
 
 **Default Location**: `/etc/sasl2/oauth2.conf`
 
@@ -483,7 +482,9 @@ sasl_oauth2_audience: your-audience
 
 ### Postfix Integration
 
-**⚠️ IMPORTANT**: Postfix uses SASL configuration files **WITHOUT** the `sasl_` prefix.
+**⚠️ IMPORTANT**: Postfix reads only a subset of SASL configuration options from `/etc/sasl2/smtpd.conf`. As described in the [Postfix SASL documentation](https://www.postfix.org/SASL_README.html), plugin-specific configuration belongs in the plugin's own configuration file.
+
+OAuth2 plugin configuration should go in the fallback configuration file `/etc/sasl2/oauth2.conf`.
 
 ```ini
 # /etc/postfix/main.cf
@@ -493,13 +494,15 @@ smtpd_sasl_path = smtpd
 smtpd_sasl_security_options = noanonymous
 smtpd_sasl_local_domain = example.com
 
-# /etc/sasl2/smtpd.conf - SASL plugin configuration (NO sasl_ prefix!)
+# /etc/sasl2/smtpd.conf - SASL mechanism configuration only
+mech_list: oauthbearer xoauth2 plain login
+
+# /etc/sasl2/oauth2.conf - OAuth2 plugin configuration (fallback file)
 oauth2_discovery_url: https://your-provider.com/.well-known/openid-configuration
 oauth2_client_id: your-smtp-client-id
 oauth2_audience: your-smtp-audience
 oauth2_user_claim: email
 oauth2_scope: openid email profile
-mech_list: oauthbearer xoauth2 plain login
 ```
 
 ### Dovecot Integration
