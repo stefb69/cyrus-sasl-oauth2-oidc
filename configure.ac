@@ -158,9 +158,11 @@ fi
 
 # Check liboauth2 API version (oauth2_token_verify signature changed in 2.2.0)
 AC_MSG_CHECKING([whether oauth2_token_verify uses 5 or 6 parameters])
+save_CPPFLAGS="$CPPFLAGS"
 save_CFLAGS="$CFLAGS"
 save_LIBS="$LIBS"
-CFLAGS="$CFLAGS -I/usr/include -I/usr/local/include"
+CPPFLAGS="$CPPFLAGS $OAUTH2_CPPFLAGS"
+CFLAGS="-c"
 LIBS="$LIBS -loauth2 -ljansson"
 
 # Try to compile with 6 parameters (new API >= 2.2.0)
@@ -171,12 +173,12 @@ AC_COMPILE_IFELSE(
 #include <jansson.h>
         ]],
         [[
-oauth2_log_t *log = NULL;
-oauth2_cfg_token_verify_t *verify = NULL;
+oauth2_log_t *log = (oauth2_log_t *)0;
+oauth2_cfg_token_verify_t *verify = (oauth2_cfg_token_verify_t *)0;
 const char *token = "test";
-json_t *payload = NULL;
-oauth2_http_status_code_t status = 0;
-(void)oauth2_token_verify(log, NULL, verify, token, &payload, &status);
+json_t *payload = (json_t *)0;
+oauth2_http_status_code_t status_code = 0;
+(void)oauth2_token_verify(log, (oauth2_http_request_t *)0, verify, token, &payload, &status_code);
         ]])],
     [
         AC_MSG_RESULT([6 parameters (liboauth2 >= 2.2.0)])
@@ -186,6 +188,7 @@ oauth2_http_status_code_t status = 0;
 	OAUTH2_CPPFLAGS="$OAUTH2_CPPFLAGS -DLIBOAUTH2_OLD_API"
     ])
 
+CPPFLAGS="$save_CPPFLAGS"
 CFLAGS="$save_CFLAGS"
 LIBS="$save_LIBS"
 
