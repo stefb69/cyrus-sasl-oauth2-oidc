@@ -769,6 +769,21 @@ This plugin is licensed under the MIT License. See the LICENSE file for details.
 
 ## Changelog
 
+### Version 1.0.2
+- Extend fallback configuration file to support all OAuth2 options
+- Fix memory leaks in fallback config when both singular and plural forms are present
+- Secure clearing of client_secret before freeing memory
+- Consistent configuration priority: SASL getopt > fallback file > compiled-in defaults
+- Updated Postfix documentation to use fallback config file
+
+### Version 1.0.1
+- Fix OAuth2 plugin initialization failure with SASL tools
+- Add fallback configuration file support (/etc/sasl2/oauth2.conf)
+- Detect XOAUTH2 vs OAUTHBEARER authentication type
+- Allow additional parameters in OAUTHBEARER between a=... and auth=
+- Fix liboauth2 >= 2.2.0 API compatibility (oauth2_token_verify 6-parameter signature)
+- Fix configure.ac API detection for RPM builds with strict CFLAGS
+
 ### Version 1.0.0
 - Initial release with liboauth2 integration
 - Support for XOAUTH2 and OAUTHBEARER mechanisms

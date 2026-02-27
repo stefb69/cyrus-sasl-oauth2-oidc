@@ -25,7 +25,7 @@
 #include "oauth2_types.h"
 
 /* Plugin version and identification */
-#define OAUTH2_PLUGIN_VERSION "1.0.0"
+#define OAUTH2_PLUGIN_VERSION "1.0.2"
 #define OAUTH2_PLUGIN_NAME "cyrus-sasl-oauth2-oidc"
 
 /* Supported SASL mechanisms */

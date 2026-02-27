@@ -1,5 +1,5 @@
 AC_PREREQ([2.69])
-AC_INIT([cyrus-sasl-oauth2-oidc], [1.0.0], [stefb@wizzz.net])
+AC_INIT([cyrus-sasl-oauth2-oidc], [1.0.2], [stefb@wizzz.net])
 AC_CONFIG_SRCDIR([oauth2_plugin.h])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
@@ -223,7 +223,7 @@ else
 fi
 
 # Feature flags
-AC_DEFINE([OAUTH2_PLUGIN_VERSION], ["1.0.0"], [Plugin version])
+AC_DEFINE([OAUTH2_PLUGIN_VERSION], ["1.0.2"], [Plugin version])
 AC_DEFINE([HAVE_LIBOAUTH2], [1], [Define if you have liboauth2])
 
 AC_CONFIG_FILES([
